@@ -1,19 +1,16 @@
-# Complete Streamlit RAG App with persistent data folder + streaming + avatars
-
 import streamlit as st
 import os
 import subprocess
 from utils.embedding import get_embedding, chunk_text
-from utils.init_db import init_db, add_document, retrieve_similar, debug_db_stats
-from utils.loader import load_document
+from utils.init_db import init_db, retrieve_similar, debug_db_stats, clear_documents, ingest_folder
 from utils.llm import query_llm_stream
 
 # ----------------------------
 # Config
 # ----------------------------
 DATA_FOLDER = "data"
-LOGO = "./Images/304ai_logo.ico"
 os.makedirs(DATA_FOLDER, exist_ok=True)
+LOGO = "./Images/304ai_logo.ico"
 
 # ----------------------------
 # Helper: List Ollama models via CLI
@@ -63,6 +60,13 @@ if st.sidebar.button("DB Status"):
     st.sidebar.write(f"Chunks stored: {count}")
     st.sidebar.write(f"Embedding dimensions: {dims}")
 
+if st.sidebar.button("Reindex Documents"):
+    st.sidebar.info("Reindexing... this may take a few seconds.")
+    clear_documents()
+    total_chunks = ingest_folder(selected_embedding_model)
+    st.sidebar.success(f"Reindex complete — {total_chunks} chunks stored.")
+
+
 # ----------------------------
 # Ingest new uploads
 # ----------------------------
@@ -73,26 +77,6 @@ if uploaded_file:
     with open(save_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
     st.success(f"Saved {uploaded_file.name}")
-
-# ----------------------------
-# Index all files in data folder
-# ----------------------------
-@st.cache_data(show_spinner=True)
-def ingest_folder(folder, embedding_model):
-    indexed = 0
-    for fname in os.listdir(folder):
-        fpath = os.path.join(folder, fname)
-        if not os.path.isfile(fpath):
-            continue
-        text = load_document(fpath)
-        chunks = chunk_text(text)
-        for chunk in chunks:
-            embedding = get_embedding(chunk, model=embedding_model)
-            add_document(chunk, embedding)
-            indexed += 1
-    return indexed
-
-st.sidebar.button("Reindex Documents", on_click=lambda: ingest_folder(DATA_FOLDER, selected_embedding_model))
 
 # ----------------------------
 # Chat Session State

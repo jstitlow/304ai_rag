@@ -1,59 +1,32 @@
 from pypdf import PdfReader
-from pathlib import Path
-import io
-
+import os
 
 def load_document(source):
     """
-    Returns raw text from txt or pdf.
-
     Accepts either:
     - Streamlit UploadedFile
-    - file path string / Path
+    - file path string
     """
 
-    # =========================================================
-    # CASE 1 — Streamlit UploadedFile (your original behavior)
-    # =========================================================
-    if hasattr(source, "type") and hasattr(source, "read"):
+    # -------- Uploaded file --------
+    if hasattr(source, "type"):
         if source.type == "text/plain":
             return source.read().decode("utf-8")
 
         elif source.type == "application/pdf":
             reader = PdfReader(source)
-            text = ""
+            return "\n".join(page.extract_text() or "" for page in reader.pages)
 
-            for page in reader.pages:
-                page_text = page.extract_text()
-                if page_text:
-                    text += page_text + "\n"
+    # -------- File path --------
+    elif isinstance(source, str):
+        ext = os.path.splitext(source)[1].lower()
 
-            return text
+        if ext == ".txt":
+            with open(source, "r", encoding="utf-8") as f:
+                return f.read()
 
-        else:
-            raise ValueError(f"Unsupported file type: {source.type}")
+        elif ext == ".pdf":
+            reader = PdfReader(source)
+            return "\n".join(page.extract_text() or "" for page in reader.pages)
 
-    # =========================================================
-    # CASE 2 — File path (new persistent data folder support)
-    # =========================================================
-    path = Path(source)
-
-    if not path.exists():
-        raise FileNotFoundError(path)
-
-    if path.suffix.lower() == ".txt":
-        return path.read_text(encoding="utf-8", errors="ignore")
-
-    elif path.suffix.lower() == ".pdf":
-        reader = PdfReader(str(path))
-        text = ""
-
-        for page in reader.pages:
-            page_text = page.extract_text()
-            if page_text:
-                text += page_text + "\n"
-
-        return text
-
-    else:
-        raise ValueError(f"Unsupported file type: {path.suffix}")
+    raise ValueError(f"Unsupported document source: {source}")
