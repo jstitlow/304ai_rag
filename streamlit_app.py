@@ -1,9 +1,11 @@
 import streamlit as st
 import os
-import subprocess
+
 from utils.embedding import get_embedding, chunk_text
-from utils.init_db import init_db, retrieve_similar, debug_db_stats, clear_documents, ingest_folder
+from utils.init_db import init_db, retrieve_similar, debug_db_stats, clear_documents, ingest_folder, add_document, hash_file
 from utils.llm import query_llm_stream
+from utils.loader import load_document
+from utils.llm import get_installed_ollama_models
 
 # ----------------------------
 # Config
@@ -13,27 +15,15 @@ os.makedirs(DATA_FOLDER, exist_ok=True)
 LOGO = "./Images/304ai_logo.ico"
 
 # ----------------------------
-# Helper: List Ollama models via CLI
-# ----------------------------
-def get_installed_ollama_models():
-    try:
-        result = subprocess.run(["ollama", "list"], capture_output=True, text=True, check=True)
-        lines = result.stdout.strip().split("\n")
-        model_lines = [line for line in lines if line and not line.startswith("NAME")]
-        return [line.split()[0] for line in model_lines]
-    except Exception as e:
-        st.sidebar.error(f"Error fetching Ollama models: {e}")
-        return []
-
-# ----------------------------
-# Initialize DB
+# Initialize DB & load ollam models
 # ----------------------------
 init_db()
+get_installed_ollama_models()
 
 # ----------------------------
 # Sidebar
 # ----------------------------
-st.title("304ai DATA ASSISTANT")
+st.title("304ai Data Assistant")
 st.sidebar.header("Settings")
 all_models = get_installed_ollama_models()
 
@@ -58,7 +48,7 @@ Answer:""",
 if st.sidebar.button("DB Status"):
     count, dims = debug_db_stats()
     st.sidebar.write(f"Chunks stored: {count}")
-    st.sidebar.write(f"Embedding dimensions: {dims}")
+    st.sidebar.write(f"Embedding dimensions: {dims:.0f}" if dims else "Embedding dimensions: N/A")
 
 if st.sidebar.button("Reindex Documents"):
     st.sidebar.info("Reindexing... this may take a few seconds.")
@@ -70,13 +60,46 @@ if st.sidebar.button("Reindex Documents"):
 # ----------------------------
 # Ingest new uploads
 # ----------------------------
-uploaded_file = st.file_uploader("Upload document", type=["txt", "pdf"], label_visibility="collapsed")
+uploaded_file = st.file_uploader(
+    "Upload document", type=["txt", "pdf"], label_visibility="collapsed"
+)
 
 if uploaded_file:
     save_path = os.path.join(DATA_FOLDER, uploaded_file.name)
-    with open(save_path, "wb") as f:
-        f.write(uploaded_file.getbuffer())
-    st.success(f"Saved {uploaded_file.name}")
+
+    if os.path.exists(save_path):
+        st.info(f"File '{uploaded_file.name}' is already uploaded.")
+    else:
+        # Save file to data folder
+        with open(save_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        st.success(f"Saved '{uploaded_file.name}'")
+
+        # ----------------------------
+        # Embed and add to database
+        # ----------------------------
+        try:
+            # Load text from the uploaded file
+            text = load_document(save_path)
+
+            # Split into chunks
+            chunks = chunk_text(text)
+
+            # Track how many chunks were added
+            total_chunks = 0
+            for chunk in chunks:
+                embedding = get_embedding(chunk, model=selected_embedding_model)
+                add_document(
+                    content=chunk,
+                    embedding=embedding,
+                    filename=uploaded_file.name,
+                    file_hash=hash_file(save_path)
+                )
+                total_chunks += 1
+
+            st.success(f"Indexed {total_chunks} chunks from '{uploaded_file.name}'")
+        except Exception as e:
+            st.error(f"⚠️ Failed to process '{uploaded_file.name}': {e}")
 
 # ----------------------------
 # Chat Session State
