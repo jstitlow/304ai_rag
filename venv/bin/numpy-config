@@ -1,0 +1,6 @@
+#!/Users/joshtitlow/304ai/304ai_rag_apps/304ai_rag_0.5/venv/bin/python
+import sys
+from numpy._configtool import main
+if __name__ == '__main__':
+    sys.argv[0] = sys.argv[0].removesuffix('.exe')
+    sys.exit(main())
