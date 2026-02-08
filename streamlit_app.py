@@ -62,7 +62,7 @@ if st.sidebar.button("DB Status"):
 
 if st.sidebar.button("Reindex Documents"):
     st.sidebar.info("Reindexing... this may take a few seconds.")
-    clear_documents()
+    #clear_documents()
     total_chunks = ingest_folder(selected_embedding_model)
     st.sidebar.success(f"Reindex complete — {total_chunks} chunks stored.")
 
