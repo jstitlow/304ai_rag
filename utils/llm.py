@@ -1,6 +1,7 @@
 import ollama
 from ollama import chat, web_fetch, web_search
-
+import streamlit as st
+import subprocess
 
 # ----------------------------
 # Helper: List Ollama models via CLI

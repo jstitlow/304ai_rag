@@ -35,11 +35,9 @@ selected_embedding_model = st.sidebar.selectbox("Embedding Model", all_models, i
 
 prompt_template = st.sidebar.text_area(
     "Prompt Template",
-    """You are a helpful assistant answering questions using ONLY the provided context.
-If the answer is not contained in the context, say: \"I could not find that information in the documents.\"
-Context:
-{context}
-
+    """You are a helpful assistant answering questions using ONLY the provided context if available.
+If the context does not contain the answer, you may answer based on your general knowledge.
+Context: {context}
 Question: {question}
 Answer:""",
     height=220
@@ -52,7 +50,7 @@ if st.sidebar.button("DB Status"):
 
 if st.sidebar.button("Reindex Documents"):
     st.sidebar.info("Reindexing... this may take a few seconds.")
-    #clear_documents()
+    clear_documents()
     total_chunks = ingest_folder(selected_embedding_model)
     st.sidebar.success(f"Reindex complete — {total_chunks} chunks stored.")
 
